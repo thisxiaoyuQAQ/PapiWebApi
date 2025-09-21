@@ -140,7 +140,7 @@ public class LogManager {
                 currentLogs.save(currentLogFile);
 
                 // 打印到控制台
-                plugin.getLogger().info(logEntry);
+                //plugin.getLogger().info(logEntry);
             } catch (IOException e) {
                 plugin.getLogger().log(Level.SEVERE, "Error writing to log file", e);
             }
