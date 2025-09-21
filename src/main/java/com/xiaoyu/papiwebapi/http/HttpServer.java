@@ -32,6 +32,9 @@ public class HttpServer {
     private String proxyHeader;
     private List<String> trustedProxies;
 
+    // 请求过滤配置
+    private List<String> ignoredPaths;
+
     public HttpServer(PapiWebAPI plugin, String host, int port) {
         this.plugin = plugin;
         this.host = host;
@@ -42,10 +45,24 @@ public class HttpServer {
 
         // 从配置加载代理设置
         loadProxyConfig();
+
+        // 从配置加载请求过滤设置
+        loadFilterConfig();
     }
-    /**
-     * 加载认证配置
-     */
+    private void loadFilterConfig() {
+        ignoredPaths = plugin.getConfig().getStringList("request_filtering.ignored_paths");
+        if (ignoredPaths == null) {
+            ignoredPaths = new ArrayList<>();
+        }
+
+        // 确保默认忽略 favicon.ico
+        if (!ignoredPaths.contains("/favicon.ico")) {
+            ignoredPaths.add("/favicon.ico");
+        }
+
+        plugin.getLogger().info("Ignoring requests to paths: " + String.join(", ", ignoredPaths));
+    }
+
     /**
      * 加载认证配置
      */
@@ -86,6 +103,7 @@ public class HttpServer {
     public void reloadConfig() {
         loadAuthConfig();
         loadProxyConfig();
+        loadFilterConfig();
     }
 
     public void start() throws IOException {
@@ -113,6 +131,30 @@ public class HttpServer {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             String path = exchange.getRequestURI().getPath();
+
+            // 检查是否为需要忽略的请求路径
+            if (ignoredPaths.contains(path)) {
+                // 特殊处理某些常见请求
+                if (path.equals("/favicon.ico")) {
+                    // 可以返回一个简单的图标或404
+                    exchange.getResponseHeaders().set("Content-Type", "image/x-icon");
+                    exchange.sendResponseHeaders(404, 0);
+                    exchange.getResponseBody().close();
+                } else if (path.equals("/robots.txt")) {
+                    // 返回一个简单的robots.txt
+                    String robotsTxt = "User-agent: *\nDisallow: /\n";
+                    exchange.getResponseHeaders().set("Content-Type", "text/plain");
+                    byte[] response = robotsTxt.getBytes();
+                    exchange.sendResponseHeaders(200, response.length);
+                    OutputStream os = exchange.getResponseBody();
+                    os.write(response);
+                    os.close();
+                } else {
+                    // 其他被忽略的路径直接返回404
+                    sendEmptyResponse(exchange, 404);
+                }
+                return;
+            }
 
             // 获取客户端IP地址
             String clientAddress = getClientIpAddress(exchange);
@@ -169,6 +211,13 @@ public class HttpServer {
                 handleRequest(exchange, path, clientAddress, clientRegion, fullUrl, true);
             }
 
+        }
+        /**
+         * 发送空响应
+         */
+        private void sendEmptyResponse(HttpExchange exchange, int statusCode) throws IOException {
+            exchange.sendResponseHeaders(statusCode, 0);
+            exchange.getResponseBody().close();
         }
         /**
          * 获取客户端真实IP地址

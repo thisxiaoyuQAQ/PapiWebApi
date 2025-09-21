@@ -75,6 +75,15 @@ logging:
 
   # 是否在控制台显示访问日志
   console_output: false
+  
+# 请求过滤设置
+request_filtering:
+  # 需要忽略的路径列表（不记录日志也不处理）
+  ignored_paths:
+    - "/favicon.ico"
+    - "/robots.txt"
+    # 添加其他需要忽略的路径
+
 ```
   
 
