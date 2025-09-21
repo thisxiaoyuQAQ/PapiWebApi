@@ -89,13 +89,14 @@ request_filtering:
 
 ## 📝 命令指南
 
-| 命令 | 描述 | 权限 |
-|------|------|------|
-| `/papiwebapi create <变量> [别名]` | 创建API端点 | papiwebapi.admin |
-| `/papiwebapi delete <端点或变量>` | 删除API端点 | papiwebapi.admin |
-| `/papiwebapi list` | 列出所有注册的API端点 | papiwebapi.admin |
-| `/papiwebapi reload` | 重载配置和API端点 | papiwebapi.admin |
-| `/papiwebapi logs [页码]` | 查看API访问日志 | papiwebapi.logs |
+| 命令                                 | 描述 | 权限 |
+|------------------------------------|------|------|
+| `/papiwebapi create <变量> [别名]`     | 创建API端点 | papiwebapi.admin |
+| `/papiwebapi delete <端点或变量>`       | 删除API端点 | papiwebapi.admin |
+| `/papiwebapi list`                 | 列出所有注册的API端点 | papiwebapi.admin |
+| `/papiwebapi reload`               | 重载配置和API端点 | papiwebapi.admin |
+| `/papiwebapi logs [页码]`            | 查看API访问日志 | papiwebapi.logs |
+| `/papiwebapi logs 2025-02-22 [页码]` | 查看特定日期的API访问日志 | papiwebapi.logs |
 
 > 插件指令别名：`/pwapi`
 
