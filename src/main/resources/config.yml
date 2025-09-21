@@ -4,6 +4,20 @@ server:
   host: "0.0.0.0"  # 监听地址，0.0.0.0表示所有网络接口
   port: 8088       # 监听端口
 
+# 反向代理设置
+proxy:
+  # 是否启用反向代理支持
+  enabled: false
+
+  # 用于获取真实客户端IP的HTTP头
+  # 常见值: X-Forwarded-For, X-Real-IP, CF-Connecting-IP (Cloudflare)
+  header: "X-Forwarded-For"
+
+  # 代理服务器的IP地址列表，只有来自这些IP的请求才会应用头部解析
+  # 出于安全考虑，建议设置此选项，避免IP伪造
+  # 例如: ["127.0.0.1", "10.0.0.1", "192.168.1.1"]
+  trusted_proxies: ["127.0.0.1", "0:0:0:0:0:0:0:1"]
+
 # 安全设置
 security:
   # API鉴权设置
@@ -17,3 +31,11 @@ security:
 
     # 令牌参数名称（默认为"token"）
     parameter: "token"
+
+# 日志设置
+logging:
+  # 日志保留天数 (0表示永久保留)
+  retention_days: 30
+
+  # 是否在控制台显示访问日志
+  console_output: false

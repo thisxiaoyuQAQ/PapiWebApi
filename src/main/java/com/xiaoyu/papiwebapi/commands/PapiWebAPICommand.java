@@ -125,59 +125,114 @@ public class PapiWebAPICommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
 
+                // 默认参数
                 int page = 1;
                 int entriesPerPage = 5;
+                String date = null;
 
-                // 解析页码参数
+                // 解析参数
                 if (args.length > 1) {
-                    try {
-                        page = Integer.parseInt(args[1]);
-                        if (page < 1) page = 1;
-                    } catch (NumberFormatException e) {
-                        sender.sendMessage(ChatColor.RED + "Invalid page number. Using page 1.");
-                        page = 1;
+                    // 检查是否是日期格式参数 (yyyy-MM-dd)
+                    if (args[1].matches("\\d{4}-\\d{2}-\\d{2}")) {
+                        date = args[1];
+
+                        // 如果提供了页码
+                        if (args.length > 2) {
+                            try {
+                                page = Integer.parseInt(args[2]);
+                                if (page < 1) page = 1;
+                            } catch (NumberFormatException e) {
+                                sender.sendMessage(ChatColor.RED + "Invalid page number. Using page 1.");
+                                page = 1;
+                            }
+                        }
+                    } else {
+                        // 参数是页码
+                        try {
+                            page = Integer.parseInt(args[1]);
+                            if (page < 1) page = 1;
+                        } catch (NumberFormatException e) {
+                            sender.sendMessage(ChatColor.RED + "Invalid parameter. Use a date (yyyy-MM-dd) or page number.");
+                            return true;
+                        }
                     }
                 }
 
-                // 获取日志文件
-                File logFile = new File(plugin.getDataFolder(), "logs.yml");
-                if (!logFile.exists()) {
-                    sender.sendMessage(ChatColor.RED + "No logs found.");
-                    return true;
-                }
-
-                YamlConfiguration logs = YamlConfiguration.loadConfiguration(logFile);
+                // 获取日志条目
                 List<String> logEntries = new ArrayList<>();
 
-                // 获取所有日志条目
-                for (String key : logs.getKeys(false)) {
-                    String entry = logs.getString(key + ".full_entry");
-                    if (entry != null) {
-                        logEntries.add(entry);
+                if (date != null) {
+                    // 获取特定日期的日志
+                    File logFile = plugin.getLogManager().getLogFile(date);
+                    if (logFile == null || !logFile.exists()) {
+                        sender.sendMessage(ChatColor.RED + "No logs found for date: " + date);
+                        return true;
                     }
+
+                    YamlConfiguration logs = YamlConfiguration.loadConfiguration(logFile);
+                    for (String key : logs.getKeys(false)) {
+                        String entry = logs.getString(key + ".full_entry");
+                        if (entry != null) {
+                            logEntries.add(entry);
+                        }
+                    }
+
+                    // 逆序排序，最新的日志在前
+                    logEntries.sort((e1, e2) -> e2.compareTo(e1));
+
+                    sender.sendMessage(ChatColor.YELLOW + "Showing logs for date: " + date);
+                } else {
+                    // 获取最近的日志（所有日期）
+                    logEntries = plugin.getLogManager().getRecentLogs(1000); // 限制为最近1000条
                 }
 
-                // 反向排序，最新的日志在前
-                Collections.reverse(logEntries);
-
                 // 分页显示
-                int totalPages = (int) Math.ceil((double) logEntries.size() / entriesPerPage);
+                int totalLogs = logEntries.size();
+                int totalPages = (int) Math.ceil((double) totalLogs / entriesPerPage);
+                if (totalPages == 0) totalPages = 1;
                 if (page > totalPages) page = totalPages;
 
                 sender.sendMessage(ChatColor.YELLOW + "=== API Access Logs (Page " + page + "/" + totalPages + ") ===");
 
+                if (totalLogs == 0) {
+                    sender.sendMessage(ChatColor.GRAY + "No logs found.");
+                    return true;
+                }
+
                 int startIndex = (page - 1) * entriesPerPage;
-                int endIndex = Math.min(startIndex + entriesPerPage, logEntries.size());
+                int endIndex = Math.min(startIndex + entriesPerPage, totalLogs);
 
                 for (int i = startIndex; i < endIndex; i++) {
                     sender.sendMessage(ChatColor.WHITE + logEntries.get(i));
                 }
 
+                // 显示导航提示
                 if (page < totalPages) {
-                    sender.sendMessage(ChatColor.GOLD + "Use '/papiwebapi logs " + (page + 1) + "' to view the next page.");
+                    sender.sendMessage(ChatColor.GOLD + "Use '/papiwebapi logs " + (date != null ? date + " " : "") + (page + 1) + "' for the next page.");
+                }
+
+                if (date == null && totalPages > 1) {
+                    sender.sendMessage(ChatColor.GOLD + "Use '/papiwebapi logs <date> [page]' to view logs for a specific date.");
+
+                    // 显示可用的日志日期
+                    List<File> logFiles = plugin.getLogManager().getLogFiles();
+                    if (!logFiles.isEmpty()) {
+                        StringBuilder availableDates = new StringBuilder(ChatColor.GOLD + "Available dates: ");
+                        int maxDatesToShow = 5;
+                        for (int i = 0; i < Math.min(logFiles.size(), maxDatesToShow); i++) {
+                            String fileName = logFiles.get(i).getName();
+                            String dateStr = fileName.substring(0, fileName.lastIndexOf("-log.yml"));
+                            availableDates.append(dateStr).append(i < Math.min(logFiles.size(), maxDatesToShow) - 1 ? ", " : "");
+                        }
+                        if (logFiles.size() > maxDatesToShow) {
+                            availableDates.append(", ...");
+                        }
+                        sender.sendMessage(availableDates.toString());
+                    }
                 }
 
                 break;
+
 
 
             default:
@@ -206,7 +261,8 @@ public class PapiWebAPICommand implements CommandExecutor, TabCompleter {
 
         // 如果有查看日志的权限，显示日志命令
         if (sender.hasPermission("papiwebapi.logs")) {
-            sender.sendMessage(ChatColor.GOLD + "/papiwebapi logs [page]" + ChatColor.WHITE + " - View API access logs");
+            sender.sendMessage(ChatColor.GOLD + "/papiwebapi logs [page]" + ChatColor.WHITE + " - View recent API access logs");
+            sender.sendMessage(ChatColor.GOLD + "/papiwebapi logs <date> [page]" + ChatColor.WHITE + " - View logs for a specific date (format: yyyy-MM-dd)");
         }
 
         // 显示认证信息，如果启用
@@ -230,17 +286,33 @@ public class PapiWebAPICommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 1) {
-            return Arrays.asList("create", "delete", "list", "reload").stream()
+            return Arrays.asList("create", "delete", "list", "reload", "logs").stream()
                     .filter(s -> s.startsWith(args[0].toLowerCase()))
                     .collect(Collectors.toList());
         }
 
-        if (args.length == 2 && args[0].equalsIgnoreCase("delete")) {
-            return plugin.getApiManager().getRegisteredEndpoints().stream()
-                    .filter(s -> s.startsWith(args[1].toLowerCase()))
-                    .collect(Collectors.toList());
+        if (args.length == 2) {
+            if (args[0].equalsIgnoreCase("delete")) {
+                return plugin.getApiManager().getRegisteredEndpoints().stream()
+                        .filter(s -> s.startsWith(args[1].toLowerCase()))
+                        .collect(Collectors.toList());
+            } else if (args[0].equalsIgnoreCase("logs")) {
+                // 提供可用日志日期作为补全
+                List<String> dates = new ArrayList<>();
+                for (File file : plugin.getLogManager().getLogFiles()) {
+                    String fileName = file.getName();
+                    if (fileName.endsWith("-log.yml")) {
+                        String dateStr = fileName.substring(0, fileName.lastIndexOf("-log.yml"));
+                        if (dateStr.startsWith(args[1].toLowerCase())) {
+                            dates.add(dateStr);
+                        }
+                    }
+                }
+                return dates;
+            }
         }
 
         return new ArrayList<>();
     }
+
 }

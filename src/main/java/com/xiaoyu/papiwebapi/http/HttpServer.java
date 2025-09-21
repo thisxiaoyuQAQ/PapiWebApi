@@ -27,6 +27,11 @@ public class HttpServer {
     private String configuredToken;
     private String tokenParameter;
 
+    // 反向代理配置
+    private boolean proxyEnabled;
+    private String proxyHeader;
+    private List<String> trustedProxies;
+
     public HttpServer(PapiWebAPI plugin, String host, int port) {
         this.plugin = plugin;
         this.host = host;
@@ -34,8 +39,13 @@ public class HttpServer {
 
         // 从配置加载认证设置
         loadAuthConfig();
-    }
 
+        // 从配置加载代理设置
+        loadProxyConfig();
+    }
+    /**
+     * 加载认证配置
+     */
     /**
      * 加载认证配置
      */
@@ -51,10 +61,31 @@ public class HttpServer {
     }
 
     /**
-     * 重新加载认证配置
+     * 加载代理配置
      */
-    public void reloadAuthConfig() {
+    private void loadProxyConfig() {
+        proxyEnabled = plugin.getConfig().getBoolean("proxy.enabled", false);
+        proxyHeader = plugin.getConfig().getString("proxy.header", "X-Forwarded-For");
+        trustedProxies = plugin.getConfig().getStringList("proxy.trusted_proxies");
+
+        if (trustedProxies.isEmpty()) {
+            trustedProxies.add("127.0.0.1");
+            trustedProxies.add("0:0:0:0:0:0:0:1");
+        }
+
+        plugin.getLogger().info("Reverse proxy support " + (proxyEnabled ? "enabled" : "disabled"));
+        if (proxyEnabled) {
+            plugin.getLogger().info("Using proxy header: " + proxyHeader);
+            plugin.getLogger().info("Trusted proxies: " + String.join(", ", trustedProxies));
+        }
+    }
+
+    /**
+     * 重新加载配置
+     */
+    public void reloadConfig() {
         loadAuthConfig();
+        loadProxyConfig();
     }
 
     public void start() throws IOException {
@@ -82,7 +113,9 @@ public class HttpServer {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             String path = exchange.getRequestURI().getPath();
-            String clientAddress = exchange.getRemoteAddress().getAddress().getHostAddress();
+
+            // 获取客户端IP地址
+            String clientAddress = getClientIpAddress(exchange);
             String clientRegion = IPLocationUtil.getIPLocation(clientAddress);
 
             String fullUrl = "http://" + host + ":" + port + path;
@@ -135,8 +168,40 @@ public class HttpServer {
                 // 不需要认证，直接处理请求
                 handleRequest(exchange, path, clientAddress, clientRegion, fullUrl, true);
             }
-        }
 
+        }
+        /**
+         * 获取客户端真实IP地址
+         * 支持通过反向代理的请求
+         *
+         * @param exchange HTTP交换对象
+         * @return 客户端IP地址
+         */
+        private String getClientIpAddress(HttpExchange exchange) {
+            // 获取直接连接的IP地址
+            String directIp = exchange.getRemoteAddress().getAddress().getHostAddress();
+
+            // 如果未启用代理支持，或者请求不来自受信任的代理，则返回直接IP
+            if (!proxyEnabled || !trustedProxies.contains(directIp)) {
+                return directIp;
+            }
+
+            // 从HTTP头获取真实IP
+            List<String> headers = exchange.getRequestHeaders().get(proxyHeader);
+            if (headers != null && !headers.isEmpty()) {
+                // 获取第一个IP（如果有多个IP，第一个通常是客户端真实IP）
+                String ipList = headers.get(0);
+                if (ipList != null && !ipList.isEmpty()) {
+                    // 如果头包含多个IP（用逗号分隔），取第一个
+                    String firstIp = ipList.split(",")[0].trim();
+                    plugin.getLogger().fine("Request from proxy: direct=" + directIp + ", real=" + firstIp);
+                    return firstIp;
+                }
+            }
+
+            // 如果没有找到有效的代理头，返回直接连接的IP
+            return directIp;
+        }
         /**
          * 处理API请求
          */

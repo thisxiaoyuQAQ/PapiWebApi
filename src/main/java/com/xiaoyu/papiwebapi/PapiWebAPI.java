@@ -29,6 +29,9 @@ public class PapiWebAPI extends JavaPlugin {
         // 初始化日志管理器
         logManager = new LogManager(this);
 
+        // 清理过期日志
+        logManager.cleanupOldLogs();
+
         // 初始化API管理器
         apiManager = new ApiManager(this);
         apiManager.loadApis();
@@ -124,9 +127,9 @@ public class PapiWebAPI extends JavaPlugin {
             // 重载API配置
             apiManager.loadApis();
 
-            // 重载HTTP服务器认证配置
+            // 重载HTTP服务器配置
             if (httpServer != null) {
-                httpServer.reloadAuthConfig();
+                httpServer.reloadConfig();
             }
 
             // 重启HTTP服务器以应用新配置
@@ -141,10 +144,14 @@ public class PapiWebAPI extends JavaPlugin {
         }
     }
 
-
+    /**
+     * 获取日志管理器
+     * @return 日志管理器实例
+     */
     public LogManager getLogManager() {
         return logManager;
     }
+
 
     public ApiManager getApiManager() {
         return apiManager;
