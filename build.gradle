@@ -1,0 +1,113 @@
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '7.1.2'  // 用于创建包含依赖的fat jar
+}
+
+group = 'com.xiaoyu'
+version = '1.0.0'
+description = 'Creates web API endpoints for PlaceholderAPI variables'
+
+// 存储库配置
+repositories {
+    mavenCentral()
+
+    // Paper API
+    maven {
+        url = 'https://repo.papermc.io/repository/maven-public/'
+    }
+
+    // PlaceholderAPI
+    maven {
+        url = 'https://repo.extendedclip.com/content/repositories/placeholderapi/'
+    }
+
+    // 可能需要的其他仓库
+    maven {
+        url = 'https://oss.sonatype.org/content/repositories/snapshots'
+    }
+
+    maven {
+        url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/'
+    }
+}
+
+dependencies {
+    // Paper API (provided 作用域表示编译时需要但不包含在最终jar中，因为服务器已提供)
+    compileOnly 'io.papermc.paper:paper-api:1.20.4-R0.1-SNAPSHOT'
+
+    // PlaceholderAPI (同样是provided作用域)
+    compileOnly 'me.clip:placeholderapi:2.11.6'
+
+    // 测试依赖
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.0'
+
+    // 如果你需要其他依赖，可以添加在这里
+}
+
+// 处理资源文件中的变量替换
+processResources {
+    // 替换plugin.yml中的变量
+    filesMatching('plugin.yml') {
+        expand(
+                'name': project.name,
+                'version': project.version,
+                'description': project.description
+        )
+    }
+
+    // 确保文件使用正确的编码
+    filteringCharset = 'UTF-8'
+}
+
+// 配置ShadowJar任务，用于创建包含所有依赖的jar
+shadowJar {
+    // 设置文件名格式
+    archiveFileName = "${project.name}-${project.version}.jar"
+
+    // 将依赖重定位到插件的包路径下，避免与其他插件冲突
+    relocate 'org.apache.commons', "com.yourname.papiwebapi.libs.org.apache.commons"
+
+    // 排除一些不需要的文件
+    minimize()
+
+    // 配置清单文件
+    manifest {
+        attributes(
+                'Implementation-Title': project.name,
+                'Implementation-Version': project.version,
+                'Built-By': System.properties['user.name'],
+                'Created-By': "${System.properties['java.version']} (${System.properties['java.vendor']})",
+                'Built-With': "gradle-${gradle.gradleVersion}"
+        )
+    }
+}
+
+// 让默认的build任务依赖shadowJar
+build.dependsOn shadowJar
+
+// 配置测试
+test {
+    useJUnitPlatform()
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
+}
+
+// Java编译选项
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-Xlint:deprecation', '-Xlint:unchecked']
+}
+
+// 创建源代码JAR
+task sourcesJar(type: Jar, dependsOn: classes) {
+    archiveClassifier.set('sources')
+    from sourceSets.main.allSource
+}
+
+// 创建JavaDoc JAR
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    archiveClassifier.set('javadoc')
+    from javadoc.destinationDir
+}

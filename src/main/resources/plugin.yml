@@ -1,0 +1,25 @@
+main: com.xiaoyu.papiwebapi.PapiWebAPI
+name: PapiWebAPI
+api-version: 1.16
+version: 1.0
+depend: [PlaceholderAPI]
+authors: [ZhiYu]
+description: Creates web API endpoints for PlaceholderAPI variables
+
+commands:
+  papiwebapi:
+    description: Main command for PapiWebAPI
+    usage: /papiwebapi <create|delete|list> [args...]
+    permission: papiwebapi.admin
+    aliases: [pwapi]
+
+
+permissions:
+  papiwebapi.admin:
+    description: Allows administration of PAPI Web API, including creating/deleting endpoints and reloading config
+    default: op
+  papiwebapi.logs:
+    description: Allows viewing of API access logs
+    default: op
+
+

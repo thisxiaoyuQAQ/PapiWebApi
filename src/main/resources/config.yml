@@ -1,0 +1,19 @@
+# PapiWebAPI Configuration
+
+server:
+  host: "0.0.0.0"  # 监听地址，0.0.0.0表示所有网络接口
+  port: 8088       # 监听端口
+
+# 安全设置
+security:
+  # API鉴权设置
+  authentication:
+    # 是否启用API鉴权
+    enabled: true
+
+    # 访问令牌，用于验证API请求
+    # 格式：http://server:port/token=YOUR_TOKEN/endpoint
+    token: "your_token"
+
+    # 令牌参数名称（默认为"token"）
+    parameter: "token"
